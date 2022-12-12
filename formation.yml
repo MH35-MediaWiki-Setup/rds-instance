@@ -1,0 +1,208 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: MediaWiki RDS
+Parameters:
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: RDS subnet IDs
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: RDS security group ID
+  ParameterGroup:
+    Type: String
+    Description: Parameter group name
+  OptionGroup:
+    Type: String
+    Description: Option group name
+  AllocatedStorage:
+    Type: Number
+    Description: Allocated storage
+    MinValue: 20
+    MaxValue: 65536
+    Default: 20
+  MaxAllocatedStorage:
+    Type: Number
+    Description: Max allocated storage
+    MinValue: 20
+    MaxValue: 65536
+    Default: 100
+  InstanceType:
+    Type: String
+    Description: Instance type
+    AllowedValues:
+      - db.t4g.micro
+      - db.t4g.small
+      - db.t4g.medium
+      - db.t4g.large
+      - db.t4g.xlarge
+      - db.t4g.2xlarge
+      - db.t3.micro
+      - db.t3.small
+      - db.t3.medium
+      - db.t3.large
+      - db.t3.xlarge
+      - db.t3.2xlarge
+      - db.m6g.large
+      - db.m6g.xlarge
+      - db.m6g.2xlarge
+      - db.m6g.4xlarge
+      - db.m6g.8xlarge
+      - db.m6g.12xlarge
+      - db.m6g.16xlarge
+      - db.m6gd.large
+      - db.m6gd.xlarge
+      - db.m6gd.2xlarge
+      - db.m6gd.4xlarge
+      - db.m6gd.8xlarge
+      - db.m6gd.12xlarge
+      - db.m6gd.16xlarge
+      - db.m6i.large
+      - db.m6i.xlarge
+      - db.m6i.2xlarge
+      - db.m6i.4xlarge
+      - db.m6i.8xlarge
+      - db.m6i.12xlarge
+      - db.m6i.16xlarge
+      - db.m6i.24xlarge
+      - db.m6i.32xlarge
+      - db.m5.large
+      - db.m5.xlarge
+      - db.m5.2xlarge
+      - db.m5.4xlarge
+      - db.m5.8xlarge
+      - db.m5.12xlarge
+      - db.m5.16xlarge
+      - db.m5.24xlarge
+      - db.m5d.large
+      - db.m5d.xlarge
+      - db.m5d.2xlarge
+      - db.m5d.4xlarge
+      - db.m5d.8xlarge
+      - db.m5d.12xlarge
+      - db.m5d.16xlarge
+      - db.m5d.24xlarge
+      - db.r6g.large
+      - db.r6g.xlarge
+      - db.r6g.2xlarge
+      - db.r6g.4xlarge
+      - db.r6g.8xlarge
+      - db.r6g.12xlarge
+      - db.r6g.16xlarge
+      - db.r6gd.large
+      - db.r6gd.xlarge
+      - db.r6gd.2xlarge
+      - db.r6gd.4xlarge
+      - db.r6gd.8xlarge
+      - db.r6gd.12xlarge
+      - db.r6gd.16xlarge
+      - db.r5.large
+      - db.r5.xlarge
+      - db.r5.2xlarge
+      - db.r5.4xlarge
+      - db.r5.8xlarge
+      - db.r5.12xlarge
+      - db.r5.16xlarge
+      - db.r5.24xlarge
+      - db.r5b.large
+      - db.r5b.xlarge
+      - db.r5b.2xlarge
+      - db.r5b.4xlarge
+      - db.r5b.8xlarge
+      - db.r5b.12xlarge
+      - db.r5b.16xlarge
+      - db.r5b.24xlarge
+      - db.r5d.large
+      - db.r5d.xlarge
+      - db.r5d.2xlarge
+      - db.r5d.4xlarge
+      - db.r5d.8xlarge
+      - db.r5d.12xlarge
+      - db.r5d.16xlarge
+      - db.r5d.24xlarge
+    Default: db.t4g.micro
+  DatabaseName:
+    Type: String
+    Description: Database name
+    Default: mediawiki
+    MinLength: 1
+    MaxLength: 64
+  DatabaseUser:
+    Type: String
+    Description: Database username
+    MinLength: 1
+    MaxLength: 16
+    Default: mediawiki
+  DatabasePassword:
+    Type: String
+    Description: Database password
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 41
+Conditions:
+  IsPerformanceInsightsAvailable:
+    Fn::Not:
+      - Fn::Or:
+        - !Equals
+          - !Ref InstanceType
+          - db.t2.micro
+        - !Equals
+          - !Ref InstanceType
+          - db.t2.small
+        - !Equals
+          - !Ref InstanceType
+          - db.t3.micro
+        - !Equals
+          - !Ref InstanceType
+          - db.t3.small
+Resources:
+  SubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: MediaWiki database subnet group
+      SubnetIds: !Ref Subnets
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-SubnetGroup"
+  RdsInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: !Ref AllocatedStorage
+      AllowMajorVersionUpgrade: true
+      AutoMinorVersionUpgrade: true
+      BackupRetentionPeriod: 1
+      DBInstanceClass: !Ref InstanceType
+      DBName: !Ref DatabaseName
+      DBParameterGroupName: !Ref ParameterGroup
+      DBSubnetGroupName: !Ref SubnetGroup
+      EnableCloudwatchLogsExports:
+        - audit
+        - error
+        - general
+        - slowquery
+      EnableIAMDatabaseAuthentication: false
+      EnablePerformanceInsights:
+        Fn::If:
+          - IsPerformanceInsightsAvailable
+          - true
+          - false
+      Engine: mysql
+      EngineVersion: 8.0.31
+      MasterUsername: !Ref DatabaseUser
+      MasterUserPassword: !Ref DatabasePassword
+      MaxAllocatedStorage: !Ref MaxAllocatedStorage
+      MultiAZ: true
+      NetworkType: DUAL
+      OptionGroupName: !Ref OptionGroup
+      PerformanceInsightsRetentionPeriod:
+        Fn::If:
+          - IsPerformanceInsightsAvailable
+          - 7
+          - !Ref AWS::NoValue
+      Port: 3306
+      PreferredBackupWindow: '16:00-18:00'
+      PreferredMaintenanceWindow: 'sun:18:10-sun:20:10'
+      StorageType: gp2
+      VPCSecurityGroups:
+        - !Ref RdsSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-RdsInstance"
